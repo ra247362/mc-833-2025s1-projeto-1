@@ -1,6 +1,5 @@
 all: main.c
-	gcc main.c -Llib -lcsv -o main
-
+	gcc main.c -Llib -lsqlite3 -lcjson -o main.exe
 
 clean:
-	rm main
+	rm main.exe
