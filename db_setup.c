@@ -49,7 +49,7 @@ int main(void) {
     if (fp != NULL) {
         if (fseek(fp, 0L, SEEK_END) == 0) {
             long buffer_size = ftell(fp);
-            if (buffer_size == 1) {
+            if (buffer_size == -1) {
                 fprintf(stderr, ERROR_INVALID_FILE_SIZE);
                 exit(-1);
             }
