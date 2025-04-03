@@ -8,10 +8,26 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 // To be ported to JSON config.
 #define PORT "2025"
 #define BACKLOG 5
+
+
+void *serve_client(void *fd_ptr)
+{
+    int *fd = (int *)fd_ptr;
+    if (send((int *)&fd, "Hello, world!", 13, 0) == -1)
+    {
+        perror("send");
+        close(&fd);
+        return;
+    }
+    close(&fd);
+    return;
+}
+
 
 /*
     Parameters might be args if necessary.
@@ -97,8 +113,18 @@ int main(void)
         struct sockaddr_storage client_addr;
         socklen_t addr_size;
         addr_size = sizeof client_addr;
+        char s[INET6_ADDRSTRLEN];
 
-       int accept(socket_fd, (struct sockaddr *)&client_addr, &addr_size);
+        int new_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_size);
+        if (new_fd == -1) 
+        {
+            perror("accept");
+            continue;
+        }
+
+        inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), s, sizeof s);
+        printf("Server: got connection from %s\n", s);
+
     }
 
 
