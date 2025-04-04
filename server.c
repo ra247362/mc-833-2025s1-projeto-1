@@ -16,9 +16,6 @@
 #define PORT "2025"
 #define BACKLOG 5
 
-pthread_t threads[10];
-unsigned int next_thread = 0;
-
 void *serve_client(void *fd_ptr)
 {
     int *fd = (int *)fd_ptr;
@@ -136,11 +133,10 @@ int main(void)
             perror("accept");
             continue;
         }
-
+        pthread_t thread;
         inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), s, sizeof s);
         printf("Server: got connection from %s\n", s);
-        pthread_create(&threads[next_thread], NULL, &serve_client, &new_fd);
-        next_thread = (next_thread + 1) % 10;
+        pthread_create(&thread, NULL, &serve_client, &new_fd);
     }
 
 
