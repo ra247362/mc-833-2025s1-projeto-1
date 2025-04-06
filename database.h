@@ -1,3 +1,5 @@
+#include <lib/sqlite3.h>
+
 /*
 Functions:
     - Create movie (ID (SQLite handled), string Name, int ReleaseYear, string[] Genres, string Director)
@@ -10,8 +12,14 @@ Functions:
     - List details from movie by ID (ID_Movie)
 */
 
+//CHECKS IF THE DATABASE HAS ALREADY BEEN CREATED
+int database_already_crreated();
+//MARK DATABASE AS CREATED ON FIRST EXECUTION
+void mark_database_as_created();
+//EXECUTE THE SQL FILE CONTAINING THE FIRST MOVIES
+void execute_sql_file(const char * file_name);
 // POST TITLE RELEASE_YEAR GENRES[COMMA SEPARATED, NO WHITESPACE] DIRECTOR
-int create_movie(const char * const title, int release_year, const char * const * const genres, const char * diretor);
+int create_movie(const char * const title, int release_year, const char * const * const genres, const char * director);
 // PUT ID GENRE
 int update_movie_genre(int id, const char * const genre);
 // DELETE ID
