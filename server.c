@@ -11,15 +11,128 @@
 #include <pthread.h>
 #include <errno.h>
 #include <signal.h>
+#include "database.h"
+#include "protocol.h"
+#include "message.h"
+#include "utils.h"
 
 // To be ported to JSON config.
 #define PORT "2025"
 #define BACKLOG 5
+#define MAX_MESSAGE_LEN 1024
+#define MAX_SEGMENT_LEN 256
+#define MAX_ARG_LEN 768
+
+int extract_message(const char * message, char * command, char args[][1024]) {
+    u_int32_t len = strlen(message);
+    u_int32_t arg_count = 0;
+    u_int32_t current_section = 0;
+    if (len == 0) return -1;
+    if (message[0] == ':') return -1;
+    for (int i = 0; i < len; i++) {
+        if (message[i] == ':' && message[i-1] != '\\') {
+            if (arg_count == 0) {
+                command[current_section] = '\0';
+            } else {
+                args[arg_count-1][current_section] = '\0';
+            }
+            arg_count++;
+            current_section = 0;
+            continue;
+        }
+
+        if (arg_count == 0) {
+            command[current_section] = message[i];
+            current_section++;
+        } else {
+            if (message[i] == ':') {
+                args[arg_count-1][current_section-1] = ':';
+            } else {
+                args[arg_count-1][current_section] = message[i];
+                current_section++;
+            }
+        }
+    }
+    return arg_count;
+}
+
 
 void *serve_client(void *fd_ptr)
 {
+    char message[MAX_MESSAGE_LEN];
+    char command[MAX_SEGMENT_LEN];
+    char args[10][1024]; // We will not be using more than 10 args (we use much less, actually)
+
+
     int *fd = (int *)fd_ptr;
     int connection_fd = *fd;    //Ensures we copy the FD so we don't close another thread's connection.
+    u_int32_t bytes_received = 0;
+    u_int32_t arg_count = 0;
+
+    memset(&message, 0, sizeof message);
+    memset(&command, 0, sizeof command);
+    for(int i = 0; i < 10; i++) memset(&args[i], 0, sizeof args[i]);
+
+    while(bytes_received < MAX_MESSAGE_LEN) {
+        u_int32_t received = recv(connection_fd, &message+bytes_received, MAX_MESSAGE_LEN, 0);
+        if (!received) {
+            close(connection_fd);
+            pthread_exit(NULL);
+            return NULL;
+        } else if (received < 0) {
+            perror("receive");
+            continue;
+        }
+        bytes_received += received;
+        if (message[bytes_received] == '\0') break;// Early end transmission
+    }
+
+    arg_count = extract_message(message, command, args);
+
+    if (strcmp(command, GET) == 0) {
+        if (strcmp(args[0], ALL) == 0) {
+
+        } else if (strcmp(args[0], ALL_DETAILED) == 0) {
+
+        } else if (strcmp(args[0], ALL_GENRE) == 0) {
+
+        } else if (strcmp(args[0], SINGLE) == 0) {
+
+        } else {
+            send(connection_fd, ERROR_MSG_INVALID_GET, 20, 0);
+        }
+    } else if (strcmp(command, POST) == 0) {
+        if (arg_count == 4) {
+
+        } else {
+            send(connection_fd, ERROR_MSG_INVALID_POST, 21, 0);
+        }
+    } else if (strcmp(command, PUT) == 0) {
+        if (arg_count == 2) {
+
+        } else {
+            send(connection_fd, ERROR_MSG_INVALID_PUT, 20, 0);
+        }
+    } else if (strcmp(command, DELETE) == 0) {
+        if (arg_count == 1) {
+            int id = -1;
+            if (is_int(args[0])) {
+                id = str_to_int(args[0]);
+                int result = remove_movie(id);
+            }
+            if (id == 0) {
+                send(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 0);
+            } else {
+                send(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 0);
+            }
+        } else {
+            send(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 0);
+        }
+    } else {
+        // Invalid command
+        send(connection_fd, ERROR_MSG_INVALID_COMMAND, 24, 0);
+    }
+
     if (send(connection_fd, "Hello, world!", 13, 0) == -1)
     {
         perror("send");
