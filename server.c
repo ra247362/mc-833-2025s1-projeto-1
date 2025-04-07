@@ -95,7 +95,6 @@ void *serve_client(void *fd_ptr)
             int operation = select_all_movies(&result);
             if (operation == 1) {
                 send_complete(connection_fd, result, strlen(result), strlen(result), 0);
-                printf("%s\n", result);
                 free(result);
             }
             else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);

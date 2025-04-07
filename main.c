@@ -116,7 +116,7 @@ void list_movies() {
     status = recv_complete(sockfd, json, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
     if (status == -1){
 	    exit(1);
-	} else if (status == 0) close(sockfd);
+	} else if (status == 1) close(sockfd);
 
     if (json) {
         printf("Filmes:\n%s\n", json);
@@ -277,7 +277,7 @@ int main(int argc, char *argv[]) {
             default:
                 printf("Opção inválida!\n");
         }
-    } while (option != 0 && status != 0);
+    } while (option != 0 && status != 1);
 
     return 0;
 }

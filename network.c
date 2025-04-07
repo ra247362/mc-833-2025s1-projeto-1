@@ -36,6 +36,7 @@ int recv_complete(int __fd, const char const *__buf, int __n, int __max_message_
     u_int32_t bytes_received;
     u_int32_t err_count = 0;
     while(bytes_received < __max_message_len) {
+        printf("%s\n", __buf);
         u_int32_t received = recv(__fd, __buf+bytes_received, __max_message_len, 0);
         if (!received) {
             close(__fd);
@@ -48,6 +49,8 @@ int recv_complete(int __fd, const char const *__buf, int __n, int __max_message_
             }
             continue;
         }
+        printf("Update: %s\n", __buf);
+
         bytes_received += received;
         if (__buf[bytes_received] == '\0') break;// Early end transmission
     }
