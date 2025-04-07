@@ -17,6 +17,7 @@
 #include "utils.h"
 #include "network.h"
 #include <time.h>
+#include "lib/cJSON.h"
 
 // To be ported to JSON config.
 #define PORT "2025"
@@ -24,6 +25,11 @@
 #define MAX_MESSAGE_LEN 1024
 #define MAX_SEGMENT_LEN 256
 #define MAX_ARG_LEN 768
+
+int parse_query_results(cJSON * results) {
+    
+}
+
 
 int extract_message(const char * message, char * command, char args[][1024]) {
     u_int32_t len = strlen(message);

@@ -79,7 +79,8 @@ void add_genre_to_movie() {
 }
 
 void list_movies() {
-    char *json = select_all_movies();
+    char *json;
+    select_all_movies(json);
     if (json) {
         printf("Filmes:\n%s\n", json);
         free(json);
@@ -89,7 +90,8 @@ void list_movies() {
 }
 
 void list_movies_with_details() {
-    char *json = select_all_movies_details();
+    char *json;
+    select_all_movies_details(json);
     if (json) {
         printf("Filmes (detalhado):\n%s\n", json);
         free(json);
@@ -105,7 +107,8 @@ void list_movies_by_genre() {
     fgets(genre, sizeof(genre), stdin);
     genre[strcspn(genre, "\n")] = 0;
 
-    char *json = select_all_movies_by_genre(genre);
+    char *json;
+    select_all_movies_by_genre(genre, json);
     if (json) {
         printf("Filmes com gênero '%s':\n%s\n", genre, json);
         free(json);
@@ -121,7 +124,8 @@ void list_movie_details_by_id() {
     scanf("%d", &id);
     clear_input();
 
-    char *json = select_movie_by_ID(id);
+    char *json;
+    select_movie_by_ID(id, json);
     if (json) {
         printf("Detalhes do filme:\n%s\n", json);
         free(json);
