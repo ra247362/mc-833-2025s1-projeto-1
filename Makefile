@@ -1,7 +1,10 @@
 all: main.c
-	gcc main.c -Llib -lsqlite3 -lcjson -o main.exe
-	gcc server.c -Llib -lsqlite3 -lcjson -pthread -o server.exe
-	gcc client.c -Llib -lsqlite3 -lcjson -o client.exe
+	gcc -c utils.c -Llib -lsqlite3 -lcjson
+	gcc -c network.c -Llib -lsqlite3 -lcjson
+	gcc -c database.c -Llib -lsqlite3 -lcjson
+	gcc main.c database.o network.o -Llib -lsqlite3 -lcjson -o main.exe
+	gcc server.c network.o database.o utils.o -Llib -lsqlite3 -lcjson -pthread -o server.exe
+#	gcc client.c network.o -Llib -lsqlite3 -lcjson -o client.exe
 
 
 clean:

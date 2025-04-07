@@ -16,6 +16,7 @@
 #define ERROR_MSG_DB_MISC_DB "ERROR: database was unable to complete operation."
 #define ERROR_DATABASE_OPEN "ERROR: Could not open database: %s\n"
 #define ERROR_TABLE_CREATION "ERROR: Could not create table: %s\n"
+#define ERROR_DB_SETUP "ERROR: SQLite failed: %s"
 
 // CLIENT
 

@@ -5,12 +5,18 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <unistd.h>
+
+void close_connection(int __fd) {
+    if (send(__fd, "", 0, 0) == -1) exit(-1);
+    close(__fd);
+}
 
 int send_complete(int __fd, const char const  *__buf, int __n, int __max_message_len, int __flags) {
     u_int32_t bytes_sent;
     u_int32_t err_count = 0;
     while(bytes_sent < __max_message_len) {
-        u_int32_t sent = send(__fd, &__buf+bytes_sent, __max_message_len, 0);
+        u_int32_t sent = send(__fd, __buf+bytes_sent, __max_message_len, 0);
         if (sent < 0) {
             perror("send");
             err_count++;
@@ -30,7 +36,7 @@ int recv_complete(int __fd, const char const *__buf, int __n, int __max_message_
     u_int32_t bytes_received;
     u_int32_t err_count = 0;
     while(bytes_received < __max_message_len) {
-        u_int32_t received = recv(__fd, &__buf+bytes_received, __max_message_len, 0);
+        u_int32_t received = recv(__fd, __buf+bytes_received, __max_message_len, 0);
         if (!received) {
             close(__fd);
             return 1;
@@ -48,3 +54,11 @@ int recv_complete(int __fd, const char const *__buf, int __n, int __max_message_
     return 0;
 }
 
+void *get_in_addr(struct sockaddr *sa)
+{
+	if (sa->sa_family == AF_INET) {
+		return &(((struct sockaddr_in*)sa)->sin_addr);
+	}
+
+	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}

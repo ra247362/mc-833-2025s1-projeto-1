@@ -19,15 +19,8 @@
 #include <time.h>
 #include "lib/cJSON.h"
 
-// To be ported to JSON config.
-#define PORT "2025"
-#define BACKLOG 5
-#define MAX_MESSAGE_LEN 1024
-#define MAX_SEGMENT_LEN 256
-#define MAX_ARG_LEN 768
-
-int parse_query_results(cJSON * results) {
-    
+int parse_query_results(const char * results) {
+    cJSON *parsed = cJSON_ParseWithLength(results, strlen(results));
 }
 
 
@@ -66,8 +59,8 @@ int extract_message(const char * message, char * command, char args[][1024]) {
 
 void *serve_client(void *fd_ptr)
 {
-    char message[MAX_MESSAGE_LEN];
-    char command[MAX_SEGMENT_LEN];
+    char message[MAX_MESSAGE_LEN+1];
+    char command[MAX_SEGMENT_LEN+1];
     char args[10][1024]; // We will not be using more than 10 args (we use much less, actually)
 
     int *fd = (int *)fd_ptr;
@@ -88,25 +81,32 @@ void *serve_client(void *fd_ptr)
         return NULL;
     }
 
+    printf("HERE\n");
+
     arg_count = extract_message(message, command, args);
+
+    printf("command %s\n", command);
+    printf("args %s\n", args[0]);
+
 
     if (strcmp(command, GET) == 0) {
         char * result;
         if (strcmp(args[0], ALL) == 0) {
-            int operation = select_all_movies(result);
+            int operation = select_all_movies(&result);
             if (operation == 1) {
                 send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                printf("%s\n", result);
                 free(result);
             }
             else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
         } else if (strcmp(args[0], ALL_DETAILED) == 0) {
-            int operation = select_all_movies(result);
+            int operation = select_all_movies(&result);
             if (operation == 1) {
                 send_complete(connection_fd, result, strlen(result), strlen(result), 0);
                 free(result);
             }            else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
         } else if (strcmp(args[0], ALL_GENRE) == 0) {
-            int operation = select_all_movies_by_genre(args[1], result);
+            int operation = select_all_movies_by_genre(args[1], &result);
             if (operation == 1) {
                 send_complete(connection_fd, result, strlen(result), strlen(result), 0);
                 free(result);
@@ -115,7 +115,7 @@ void *serve_client(void *fd_ptr)
             int id = 0;
             int is_int = str_to_int(args[0], &id);
             if (is_int) {
-                int operation = select_movie_by_ID(id, result);
+                int operation = select_movie_by_ID(id, &result);
                 if (operation == 1) {
                     send_complete(connection_fd, result, strlen(result), strlen(result), 0);
                     free(result);
@@ -187,25 +187,16 @@ void *serve_client(void *fd_ptr)
         send_complete(connection_fd, ERROR_MSG_INVALID_COMMAND, 24, 24, 0);
     }
 
-    if (send(connection_fd, "Hello, world!", 13, 0) == -1)
-    {
-        perror("send");
-        close(connection_fd);
-        pthread_exit("error");
-        return NULL;
-    }
-    close(connection_fd);
+    // if (send(connection_fd, "Hello, world!", 13, 0) == -1)
+    // {
+    //     perror("send");
+    //     close(connection_fd);
+    //     pthread_exit("error");
+    //     return NULL;
+    // }
+    close_connection(connection_fd);
     pthread_exit(0);
     return NULL;
-}
-
-void *get_in_addr(struct sockaddr *socket_addr) {
-    if (socket_addr->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)socket_addr)->sin_addr);
-    }
-
-    return &(((struct sockaddr_in6*)socket_addr)->sin6_addr);
-
 }
 
 /*
@@ -225,6 +216,17 @@ int main(void)
     struct addrinfo *p;                 // To be an item of the linked list
 
     srand((unsigned int)time(NULL));    // Initialize randomness. Used in DB for concurrency control.
+
+    // DB config
+
+    if (!database_already_created()) {
+        int status = execute_sql_file("setup.sql");
+        if (!status) exit(-1);
+        mark_database_as_created();
+        printf("Banco de dados criado e configurado.\n");
+    } else {
+        printf("Banco de dados já configurado.\n");
+    }
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;        // IPv4 or IPv6

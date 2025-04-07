@@ -1,10 +1,29 @@
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <pthread.h>
+#include <errno.h>
+#include <signal.h>
 #include "database.h"
+#include "protocol.h"
+#include "message.h"
+#include "utils.h"
+#include "network.h"
+#include <time.h>
+#include "lib/cJSON.h"
 
 #define MAX_GENRES 10
 #define MAX_LENGTH 128
+
+int sockfd;
+int status = 1;
 
 
 void clear_input() {
@@ -44,7 +63,13 @@ void add_movie() {
     }
     genres[num_genres] = NULL;
 
-    if (create_movie(title, release_year, (const char * const *)genres, director)) {
+    char genre_str[512] = "";
+    for (int i = 0; genres[i] != NULL; i++) {
+        strcat(genre_str, genres[i]);
+        if (genres[i + 1] != NULL) strcat(genre_str, ",");
+    }
+
+    if (create_movie(title, release_year, genre_str, director)) {
         printf("Filme criado com sucesso!\n");
     } else {
         printf("Erro ao criar o filme.\n");
@@ -79,11 +104,22 @@ void add_genre_to_movie() {
 }
 
 void list_movies() {
-    char *json;
-    select_all_movies(json);
+    int size = 0;
+    char json[MAX_CLIENT_RECEIVE_DATA];
+    char request[] = "GET:ALL";
+
+    //select_all_movies(&json);
+    if (send_complete(sockfd, request, 8, MAX_MESSAGE_LEN, 0) == -1) {
+        exit(-1);
+    }
+    
+    status = recv_complete(sockfd, json, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    if (status == -1){
+	    exit(1);
+	} else if (status == 0) close(sockfd);
+
     if (json) {
         printf("Filmes:\n%s\n", json);
-        free(json);
     } else {
         printf("Nenhum filme encontrado.\n");
     }
@@ -91,7 +127,7 @@ void list_movies() {
 
 void list_movies_with_details() {
     char *json;
-    select_all_movies_details(json);
+    select_all_movies_details(&json);
     if (json) {
         printf("Filmes (detalhado):\n%s\n", json);
         free(json);
@@ -108,7 +144,7 @@ void list_movies_by_genre() {
     genre[strcspn(genre, "\n")] = 0;
 
     char *json;
-    select_all_movies_by_genre(genre, json);
+    select_all_movies_by_genre(genre, &json);
     if (json) {
         printf("Filmes com gênero '%s':\n%s\n", genre, json);
         free(json);
@@ -125,7 +161,7 @@ void list_movie_details_by_id() {
     clear_input();
 
     char *json;
-    select_movie_by_ID(id, json);
+    select_movie_by_ID(id, &json);
     if (json) {
         printf("Detalhes do filme:\n%s\n", json);
         free(json);
@@ -148,15 +184,55 @@ void remove_movie_by_id() {
     }
 }
 
-int main() {
-    if (!database_already_created()) {
-        execute_sql_file("setup.sql");
-        mark_database_as_created();
-        printf("Banco de dados criado e configurado.\n");
-    } else {
-        printf("Banco de dados já configurado.\n");
-    }
-    int opcao;
+int main(int argc, char *argv[]) {
+    int numbytes, option;  
+	char buf[MAX_CLIENT_RECEIVE_DATA];
+	struct addrinfo hints, *servinfo, *p;
+	int rv;
+	char s[INET6_ADDRSTRLEN];
+
+	// if (argc != 2) {
+	//     fprintf(stderr,"usage: ./client HOST_NAME\n");
+	//     exit(1);
+	// }
+
+
+    memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if ((rv = getaddrinfo("127.0.0.0", PORT, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+		return 1;
+	}
+
+	// loop through all the results and connect to the first we can
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,
+				p->ai_protocol)) == -1) {
+			perror("client: socket");
+			continue;
+		}
+
+		if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+			perror("client: connect");
+			close(sockfd);
+			continue;
+		}
+
+		break;
+	}
+
+	freeaddrinfo(servinfo); // all done with this structure
+
+	if (p == NULL) {
+		fprintf(stderr, "client: failed to connect\n");
+		return 2;
+	}
+
+	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
+			s, sizeof s);
+	printf("client: connecting to %s\n", s);
 
     do {
         printf("\n===== MENU =====\n");
@@ -169,10 +245,10 @@ int main() {
         printf("7. Remover filme por ID\n");
         printf("0. Sair\n");
         printf("Escolha o número da opção desejada: ");
-        scanf("%d", &opcao);
+        scanf("%d", &option);
         clear_input();
 
-        switch (opcao) {
+        switch (option) {
             case 1:
                 add_movie();
                 break;
@@ -196,11 +272,12 @@ int main() {
                 break;
             case 0:
                 printf("Saindo...\n");
+                close(sockfd);
                 break;
             default:
                 printf("Opção inválida!\n");
         }
-    } while (opcao != 0);
+    } while (option != 0 && status != 0);
 
     return 0;
 }

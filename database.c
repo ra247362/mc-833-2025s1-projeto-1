@@ -8,9 +8,49 @@
 #include <time.h>
 
 #define CONFIG_FILE "config.json"
+#define SETUP_FILE "setup.sql"
 #define DB_FILE "movies.db"
 
 static sqlite3 *db = NULL;
+
+int execute_sql_file(const char * file_name) {
+    char * error = 0;
+    FILE *fp = fopen(SETUP_FILE, "r");
+    if (!fp) return 0;
+
+    fseek(fp, 0L, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+
+    char *buffer = malloc(size + 1);
+    if (!buffer) {
+        fclose(fp);
+        return 0;
+    }
+
+    fread(buffer, 1, size, fp);
+    buffer[size] = '\0';
+    fclose(fp);
+
+    if (sqlite3_open(DB_FILE, &db) != SQLITE_OK) {
+        fprintf(stderr, ERROR_DATABASE_OPEN, sqlite3_errmsg(db));
+        return 0;
+    }
+
+    int rc = sqlite3_exec(db, buffer, 0, 0, &error);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, ERROR_DB_SETUP, error);
+        free(buffer);
+        sqlite3_free(error);
+        sqlite3_close(db);
+        return 0;
+    }
+    free(buffer);
+    sqlite3_free(error);
+    sqlite3_close(db);
+    return 1;
+}
+
 
 int database_already_created() {
     FILE *fp = fopen(CONFIG_FILE, "r");
@@ -92,12 +132,6 @@ void disconnect_database() {
 int create_movie(const char * title, int release_year, const char * genres, const char * diretor) {
     if (!connect_database()) return -1;
 
-    // char genre_str[512] = "";
-    // for (int i = 0; genres[i] != NULL; i++) {
-    //     strcat(genre_str, genres[i]);
-    //     if (genres[i + 1] != NULL) strcat(genre_str, ",");
-    // }
-
     const char *sql = "INSERT INTO movies (title, release_year, genres, director) VALUES (?, ?, ?, ?);";
     sqlite3_stmt *stmt;
 
@@ -165,7 +199,7 @@ int update_movie_genre(int id, const char * const genre) {
         }
     }
 
-    //New string
+    //Formats string for DB
     char *new_genres = NULL;
     if (strlen(current_genres) == 0) {
         new_genres = strdup(genre);
@@ -188,7 +222,7 @@ int update_movie_genre(int id, const char * const genre) {
     sqlite3_bind_text(stmt_update, 1, new_genres, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt_update, 2, id);
 
-    int rc = sqlite3_step(stmt_update);
+    rc = sqlite3_step(stmt_update);
     while (rc == SQLITE_LOCKED) {
         struct timespec ts;
         ts.tv_sec = 0;
@@ -223,13 +257,13 @@ int remove_movie(int id) {
     return rc == SQLITE_DONE;
 }
 
-int select_all_movies(char * result) {
+int select_all_movies(char ** result) {
     if (!connect_database()) return -1;
 
     const char *sql = "SELECT id, title FROM movies;";
     sqlite3_stmt *stmt;
-
-    cJSON *json_array = cJSON_CreateArray();
+    cJSON *json = cJSON_CreateObject();
+    cJSON *query_results = cJSON_CreateArray();
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
         int rc = sqlite3_step(stmt);
         while (rc == SQLITE_LOCKED) {
@@ -242,26 +276,28 @@ int select_all_movies(char * result) {
             cJSON *movie = cJSON_CreateObject();
             cJSON_AddNumberToObject(movie, "id", sqlite3_column_int(stmt, 0));
             cJSON_AddStringToObject(movie, "title", (const char *)sqlite3_column_text(stmt, 1));
-            cJSON_AddItemToArray(json_array, movie);
+            cJSON_AddItemToArray(query_results, movie);
             rc = sqlite3_step(stmt);
         }
     }
+    cJSON_AddItemToObject(json, "query_results", query_results);
 
     sqlite3_finalize(stmt);
     disconnect_database();
 
-    result = cJSON_PrintUnformatted(json_array);
-    cJSON_Delete(json_array);
+    *result = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
     return 1;
 }
 
-int select_all_movies_details(char * result) {
+int select_all_movies_details(char ** result) {
     if (!connect_database()) return -1;
 
     const char *sql = "SELECT id, title, release_year, genres, director FROM movies;";
     sqlite3_stmt *stmt;
 
-    cJSON *json_array = cJSON_CreateArray();
+    cJSON *json = cJSON_CreateObject();
+    cJSON *query_results = cJSON_CreateArray();
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
         int rc = sqlite3_step(stmt);
         while (rc == SQLITE_LOCKED) {
@@ -277,20 +313,22 @@ int select_all_movies_details(char * result) {
             cJSON_AddNumberToObject(movie, "release_year", sqlite3_column_int(stmt, 2));
             cJSON_AddStringToObject(movie, "genres", (const char *)sqlite3_column_text(stmt, 3));
             cJSON_AddStringToObject(movie, "director", (const char *)sqlite3_column_text(stmt, 4));
-            cJSON_AddItemToArray(json_array, movie);
+            cJSON_AddItemToArray(query_results, movie);
             rc = sqlite3_step(stmt);
         }
     }
+    cJSON_AddItemToObject(json, "query_results", query_results);
+
 
     sqlite3_finalize(stmt);
     disconnect_database();
+    *result = cJSON_PrintUnformatted(json);
 
-    result = cJSON_PrintUnformatted(json_array);
-    cJSON_Delete(json_array);
+    cJSON_Delete(json);
     return 1;
 }
 
-int select_movie_by_ID(int id, char * result) {
+int select_movie_by_ID(int id, char ** result) {
     if (!connect_database()) return -1;
 
     const char *sql = "SELECT id, title, release_year, genres, director FROM movies WHERE id = ?;";
@@ -319,18 +357,19 @@ int select_movie_by_ID(int id, char * result) {
     sqlite3_finalize(stmt);
     disconnect_database();
 
-    char result = cJSON_PrintUnformatted(movie);
+    *result = cJSON_PrintUnformatted(movie);
     cJSON_Delete(movie);
-    return result;
+    return 1;
 }
 
-int select_all_movies_by_genre(const char * const genre, char * result) {
+int select_all_movies_by_genre(const char * const genre, char ** result) {
     if (!connect_database()) return -1;
 
     const char *sql = "SELECT id, title FROM movies WHERE genres LIKE ?;";
     sqlite3_stmt *stmt;
 
-    cJSON *json_array = cJSON_CreateArray();
+    cJSON *json = cJSON_CreateObject();
+    cJSON *query_results = cJSON_CreateArray();
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
         char like_param[128];
         snprintf(like_param, sizeof(like_param), "%%%s%%", genre);
@@ -346,15 +385,28 @@ int select_all_movies_by_genre(const char * const genre, char * result) {
             cJSON *movie = cJSON_CreateObject();
             cJSON_AddNumberToObject(movie, "id", sqlite3_column_int(stmt, 0));
             cJSON_AddStringToObject(movie, "title", (const char *)sqlite3_column_text(stmt, 1));
-            cJSON_AddItemToArray(json_array, movie);
+            cJSON_AddItemToArray(query_results, movie);
             rc = sqlite3_step(stmt);
         }
     }
+    cJSON_AddItemToObject(json, "query_results", query_results);
 
     sqlite3_finalize(stmt);
     disconnect_database();
 
-    result = cJSON_PrintUnformatted(json_array);
-    cJSON_Delete(json_array);
+    *result = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
     return 1;
 }
+
+// int main() {
+//     char *json;
+//     select_all_movies(&json);
+//     if (json) {
+//         printf("Filmes:\n%s\n", json);
+//         free(json);
+//     } else {
+//         printf("Nenhum filme encontrado.\n");
+//     }
+//     return 0;
+// }
