@@ -1,4 +1,4 @@
-#include <lib/sqlite3.h>
+#include "lib/sqlite3.h"
 
 /*
 Functions:
@@ -13,22 +13,22 @@ Functions:
 */
 
 //CHECKS IF THE DATABASE HAS ALREADY BEEN CREATED
-int database_already_crreated();
+int database_already_created();
 //MARK DATABASE AS CREATED ON FIRST EXECUTION
 void mark_database_as_created();
 //EXECUTE THE SQL FILE CONTAINING THE FIRST MOVIES
 void execute_sql_file(const char * file_name);
 // POST TITLE RELEASE_YEAR GENRES[COMMA SEPARATED, NO WHITESPACE] DIRECTOR
-int create_movie(const char * const title, int release_year, const char * const * const genres, const char * director);
+int create_movie(const char * title, int release_year, const char * const genres, const char * director);
 // PUT ID GENRE
 int update_movie_genre(int id, const char * const genre);
 // DELETE ID
 int remove_movie(int id);
 // GET ALL
-char * select_all_movies();
+int select_all_movies(char * result);
 // GET ALL_DETAILED
-char * select_all_movies_details();
+int  select_all_movies_details(char * result);
 // GET ALL_GENRE GENRE
-char * select_all_movies_by_genre(const char * const genre);
+int select_all_movies_by_genre(const char * const genre, char * result);
 // GET SINGLE ID
-char * select_movie_by_ID(int id);
+int select_movie_by_ID(int id, char * result);

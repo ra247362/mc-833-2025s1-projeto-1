@@ -15,6 +15,8 @@
 #include "protocol.h"
 #include "message.h"
 #include "utils.h"
+#include "network.h"
+#include <time.h>
 
 // To be ported to JSON config.
 #define PORT "2025"
@@ -56,13 +58,11 @@ int extract_message(const char * message, char * command, char args[][1024]) {
     return arg_count;
 }
 
-
 void *serve_client(void *fd_ptr)
 {
     char message[MAX_MESSAGE_LEN];
     char command[MAX_SEGMENT_LEN];
     char args[10][1024]; // We will not be using more than 10 args (we use much less, actually)
-
 
     int *fd = (int *)fd_ptr;
     int connection_fd = *fd;    //Ensures we copy the FD so we don't close another thread's connection.
@@ -73,64 +73,112 @@ void *serve_client(void *fd_ptr)
     memset(&command, 0, sizeof command);
     for(int i = 0; i < 10; i++) memset(&args[i], 0, sizeof args[i]);
 
-    while(bytes_received < MAX_MESSAGE_LEN) {
-        u_int32_t received = recv(connection_fd, &message+bytes_received, MAX_MESSAGE_LEN, 0);
-        if (!received) {
-            close(connection_fd);
-            pthread_exit(NULL);
-            return NULL;
-        } else if (received < 0) {
-            perror("receive");
-            continue;
-        }
-        bytes_received += received;
-        if (message[bytes_received] == '\0') break;// Early end transmission
+    int recv_status = recv_complete(connection_fd, message, MAX_MESSAGE_LEN, MAX_MESSAGE_LEN, 0);
+    if (recv_status == -1) {
+        pthread_exit("error");
+        return NULL;
+    } else if (recv_status == 1) {
+        pthread_exit(NULL);
+        return NULL;
     }
 
     arg_count = extract_message(message, command, args);
 
     if (strcmp(command, GET) == 0) {
+        char * result;
         if (strcmp(args[0], ALL) == 0) {
-
+            int operation = select_all_movies(result);
+            if (operation == 1) {
+                send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                free(result);
+            }
+            else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
         } else if (strcmp(args[0], ALL_DETAILED) == 0) {
-
+            int operation = select_all_movies(result);
+            if (operation == 1) {
+                send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                free(result);
+            }            else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
         } else if (strcmp(args[0], ALL_GENRE) == 0) {
-
+            int operation = select_all_movies_by_genre(args[1], result);
+            if (operation == 1) {
+                send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                free(result);
+            }            else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
         } else if (strcmp(args[0], SINGLE) == 0) {
-
+            int id = 0;
+            int is_int = str_to_int(args[0], &id);
+            if (is_int) {
+                int operation = select_movie_by_ID(id, result);
+                if (operation == 1) {
+                    send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                    free(result);
+                }
+                else if (operation == 0) send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
+                else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+            } else {
+                send_complete(connection_fd, ERROR_MSG_INVALID_GET, 20, 20, 0);
+            }
         } else {
-            send(connection_fd, ERROR_MSG_INVALID_GET, 20, 0);
+            send_complete(connection_fd, ERROR_MSG_INVALID_GET, 20, 20, 0);
         }
     } else if (strcmp(command, POST) == 0) {
         if (arg_count == 4) {
-
+            int release_year = 0;
+            int year_status = str_to_int(args[1], &release_year);
+            if (year_status == 0) {
+                send_complete(connection_fd, ERROR_MSG_INVALID_POST, 21, 21, 0);
+            }
+            int operation = create_movie(args[0], release_year, args[2], args[3]);
+            if (operation == 1) {
+                send_complete(connection_fd, SUCCESS_MSG_POST, 23, 23, 0);
+            } else {
+                send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+            }
         } else {
-            send(connection_fd, ERROR_MSG_INVALID_POST, 21, 0);
+            send_complete(connection_fd, ERROR_MSG_INVALID_POST, 21, 21, 0);
         }
     } else if (strcmp(command, PUT) == 0) {
         if (arg_count == 2) {
-
+            int id = 0;
+            int is_int = str_to_int(args[0], &id);
+            if (is_int == 1) {
+                int operation = update_movie_genre(id, args[1]);
+                if (operation == 1) {
+                    send_complete(connection_fd, SUCCESS_MSG_PUT, 23, 23, 0);
+                } else if (operation == 0) {
+                    send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
+                } else if (operation == 2) {
+                    send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 38, 38, 0);
+                } else {
+                    send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+                }
+            }
         } else {
-            send(connection_fd, ERROR_MSG_INVALID_PUT, 20, 0);
+            send_complete(connection_fd, ERROR_MSG_INVALID_PUT, 20, 20, 0);
         }
     } else if (strcmp(command, DELETE) == 0) {
         if (arg_count == 1) {
-            int id = -1;
-            if (is_int(args[0])) {
-                id = str_to_int(args[0]);
-                int result = remove_movie(id);
-            }
-            if (id == 0) {
-                send(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 0);
+            int id = 0;
+            int is_int = str_to_int(args[0], &id);
+            if (is_int == 1) {
+                int operation = remove_movie(id);
+                if (operation == 1) {
+                    send_complete(connection_fd, SUCCESS_MSG_DELETE, 23, 23, 0);
+                } else if (operation == 0) {
+                    send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
+                } else {
+                    send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+                }
             } else {
-                send(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 0);
+                send_complete(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 23, 0);
             }
         } else {
-            send(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 0);
+            send_complete(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 23, 0);
         }
     } else {
         // Invalid command
-        send(connection_fd, ERROR_MSG_INVALID_COMMAND, 24, 0);
+        send_complete(connection_fd, ERROR_MSG_INVALID_COMMAND, 24, 24, 0);
     }
 
     if (send(connection_fd, "Hello, world!", 13, 0) == -1)
@@ -169,6 +217,8 @@ int main(void)
     struct addrinfo hints;              // To be filled with relevant info
     struct addrinfo *serverinfo;        // To be filled by 'getaddrinfo'
     struct addrinfo *p;                 // To be an item of the linked list
+
+    srand((unsigned int)time(NULL));    // Initialize randomness. Used in DB for concurrency control.
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;        // IPv4 or IPv6
