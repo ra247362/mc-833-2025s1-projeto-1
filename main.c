@@ -18,6 +18,7 @@
 #include "network.h"
 #include <time.h>
 #include "lib/cJSON.h"
+#include "lib/sqlite3.h"
 
 #define MAX_GENRES 10
 #define MAX_LENGTH 128
@@ -32,10 +33,13 @@ void clear_input() {
 }
 
 void add_movie() {
+    char response[MAX_CLIENT_RECEIVE_DATA+1];
     char title[MAX_LENGTH];
     int release_year;
     char director[MAX_LENGTH];
     char *genres[MAX_GENRES + 1]; //+1 for NULL terminator
+
+    memset(&response, 0, sizeof response);
 
     printf("Título: ");
     fgets(title, sizeof(title), stdin);
@@ -69,11 +73,25 @@ void add_movie() {
         if (genres[i + 1] != NULL) strcat(genre_str, ",");
     }
 
-    if (create_movie(title, release_year, genre_str, director)) {
-        printf("Filme criado com sucesso!\n");
-    } else {
-        printf("Erro ao criar o filme.\n");
+    char *request = NULL;
+    asprintf(&request, "POST:%s:%d:%s:%s", title, release_year, genre_str, director);
+
+    if (send_complete(sockfd, request, strlen(request), MAX_MESSAGE_LEN, 0) == -1) {
+        printf("Erro");
+        free(request);
+        exit(-1);
     }
+    free(request);
+    status = recv_complete(sockfd, response, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    if (status == -1){
+        printf("Erro");
+	    exit(1);
+	} else if (status == 1) {
+        printf("Closed");
+        close(sockfd);
+    }
+
+    printf("%s", response);
 
     for (int i = 0; i < num_genres; i++) {
         free(genres[i]);
@@ -83,6 +101,9 @@ void add_movie() {
 void add_genre_to_movie() {
     int movie_id;
     char genre[MAX_LENGTH];
+    char response[MAX_CLIENT_RECEIVE_DATA + 1];
+
+    memset(&response, 0, sizeof response);
 
     printf("ID do filme: ");
     scanf("%d", &movie_id);
@@ -94,43 +115,78 @@ void add_genre_to_movie() {
 
     int result = update_movie_genre(movie_id, genre);
 
-    if (result == 1) {
-        printf("Gênero adicionado com sucesso!\n");
-    } else if (result == 2) {
-        printf("O filme já possui esse gênero.\n");
-    } else {
-        printf("Erro ao adicionar o gênero.\n");
+    char *request = NULL;
+    asprintf(&request, "PUT:%d:%s", movie_id, genre);
+
+    if (send_complete(sockfd, request, strlen(request), MAX_MESSAGE_LEN, 0) == -1) {
+        printf("Erro");
+        free(request);
+        exit(-1);
     }
+    free(request);
+    status = recv_complete(sockfd, response, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    if (status == -1){
+        printf("Erro");
+	    exit(1);
+	} else if (status == 1) {
+        printf("Closed");
+        close(sockfd);
+    }
+
+    printf("%s", response);
 }
 
 void list_movies() {
     int size = 0;
-    char json[MAX_CLIENT_RECEIVE_DATA];
+    char response[MAX_CLIENT_RECEIVE_DATA + 1];
     char request[] = "GET:ALL";
+
+    memset(&response, 0, sizeof response);
 
     //select_all_movies(&json);
     if (send_complete(sockfd, request, 8, MAX_MESSAGE_LEN, 0) == -1) {
+        printf("Erro");
         exit(-1);
     }
     
-    status = recv_complete(sockfd, json, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    status = recv_complete(sockfd, response, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
     if (status == -1){
+        printf("Erro");
 	    exit(1);
-	} else if (status == 1) close(sockfd);
+	} else if (status == 1) {
+        printf("Closed");
+        close(sockfd);
+    }
 
-    if (json) {
-        printf("Filmes:\n%s\n", json);
+    if (response) {
+        printf("Filmes:\n%s\n", response);
     } else {
         printf("Nenhum filme encontrado.\n");
     }
 }
 
 void list_movies_with_details() {
-    char *json;
-    select_all_movies_details(&json);
-    if (json) {
-        printf("Filmes (detalhado):\n%s\n", json);
-        free(json);
+    int size = 0;
+    char response[MAX_CLIENT_RECEIVE_DATA + 1];
+    char request[] = "GET:ALL_DETAILED";
+
+    memset(&response, 0, sizeof response);
+
+    if (send_complete(sockfd, request, 17, MAX_MESSAGE_LEN, 0) == -1) {
+        exit(-1);
+    }
+
+    status = recv_complete(sockfd, response, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    if (status == -1){
+        printf("Erro");
+	    exit(1);
+	} else if (status == 1) {
+        printf("Closed");
+        close(sockfd);
+    }
+
+    if (response) {
+        printf("Filmes (detalhado):\n%s\n", response);
     } else {
         printf("Nenhum filme encontrado.\n");
     }
@@ -138,16 +194,32 @@ void list_movies_with_details() {
 
 void list_movies_by_genre() {
     char genre[MAX_LENGTH];
+    char response[MAX_CLIENT_RECEIVE_DATA + 1];
+
+    memset(&response, 0, sizeof response);
 
     printf("Gênero: ");
     fgets(genre, sizeof(genre), stdin);
     genre[strcspn(genre, "\n")] = 0;
 
-    char *json;
-    select_all_movies_by_genre(genre, &json);
-    if (json) {
-        printf("Filmes com gênero '%s':\n%s\n", genre, json);
-        free(json);
+    char *request = NULL;
+    asprintf(&request, "GET:ALL_GENRE:%s", genre);
+
+    if (send_complete(sockfd, request, strlen(request), MAX_MESSAGE_LEN, 0) == -1) {
+        free(request);
+        exit(-1);
+    }
+    free(request);
+    status = recv_complete(sockfd, response, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    if (status == -1){
+        printf("Erro");
+	    exit(1);
+	} else if (status == 1) {
+        printf("Closed");
+        close(sockfd);
+    }
+    if (response) {
+        printf("Filmes com gênero '%s':\n%s\n", genre, response);
     } else {
         printf("Nenhum filme encontrado com esse gênero.\n");
     }
@@ -155,33 +227,55 @@ void list_movies_by_genre() {
 
 void list_movie_details_by_id() {
     int id;
+    char *request = NULL;
+    char response[MAX_CLIENT_RECEIVE_DATA + 1];
+
+    memset(&response, 0, sizeof response);
 
     printf("ID do filme: ");
     scanf("%d", &id);
     clear_input();
 
-    char *json;
-    select_movie_by_ID(id, &json);
-    if (json) {
-        printf("Detalhes do filme:\n%s\n", json);
-        free(json);
+    asprintf(&request, "GET:SINGLE:%d", id);
+    if (send_complete(sockfd, request, strlen(request), MAX_MESSAGE_LEN, 0) == -1) {
+        free(request);
+        exit(-1);
+    }
+    free(request);
+    status = recv_complete(sockfd, response, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    if (status == -1){
+        printf("Erro");
+	    exit(1);
+	} else if (status == 1) {
+        printf("Closed");
+        close(sockfd);
+    }
+    if (response) {
+        printf("Detalhes do filme:\n%s\n", response);
     } else {
         printf("Filme não encontrado.\n");
     }
 }
 
 void remove_movie_by_id() {
+    char response[MAX_CLIENT_RECEIVE_DATA + 1];
     int id;
+
+    memset(&response, 0, sizeof response);
 
     printf("ID do filme a remover: ");
     scanf("%d", &id);
     clear_input();
 
-    if (remove_movie(id)) {
-        printf("Filme removido com sucesso!\n");
-    } else {
-        printf("Erro ao remover o filme.\n");
+    char * request;
+    asprintf(&request, "DELETE:%d", id);
+    if (send_complete(sockfd, request, strlen(request), MAX_MESSAGE_LEN, 0) == -1) {
+        free(request);
+        exit(-1);
     }
+    free(request);
+    status = recv_complete(sockfd, response, MAX_CLIENT_RECEIVE_DATA, MAX_CLIENT_RECEIVE_DATA, 0);
+    printf("%s", response);
 }
 
 int main(int argc, char *argv[]) {
@@ -191,17 +285,16 @@ int main(int argc, char *argv[]) {
 	int rv;
 	char s[INET6_ADDRSTRLEN];
 
-	// if (argc != 2) {
-	//     fprintf(stderr,"usage: ./client HOST_NAME\n");
-	//     exit(1);
-	// }
-
+	if (argc != 2) {
+	    fprintf(stderr,"usage: ./client HOST_NAME\n");
+	    exit(1);
+	}
 
     memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	if ((rv = getaddrinfo("127.0.0.0", PORT, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
 	}
@@ -230,8 +323,8 @@ int main(int argc, char *argv[]) {
 		return 2;
 	}
 
-	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
-			s, sizeof s);
+	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
+
 	printf("client: connecting to %s\n", s);
 
     do {

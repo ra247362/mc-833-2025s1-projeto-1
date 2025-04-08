@@ -2,8 +2,8 @@ all: main.c
 	gcc -c utils.c -Llib -lsqlite3 -lcjson
 	gcc -c network.c -Llib -lsqlite3 -lcjson
 	gcc -c database.c -Llib -lsqlite3 -lcjson
-	gcc main.c database.o network.o -Llib -lsqlite3 -lcjson -o main.exe
-	gcc server.c network.o database.o utils.o -Llib -lsqlite3 -lcjson -pthread -o server.exe
+	gcc main.c database.o network.o -std=gnu99 -Llib -lsqlite3 -lcjson -pthread -ldl -o main.exe
+	gcc server.c network.o database.o utils.o -Llib -lsqlite3 -lcjson -pthread -ldl -o server.exe
 #	gcc client.c network.o -Llib -lsqlite3 -lcjson -o client.exe
 
 

@@ -19,10 +19,56 @@
 #include <time.h>
 #include "lib/cJSON.h"
 
-int parse_query_results(const char * results) {
-    cJSON *parsed = cJSON_ParseWithLength(results, strlen(results));
+void parse_query_results_short(const char * results, char ** formatted_results) {
+    cJSON *parsed = cJSON_Parse(results);
+    cJSON *query_results = cJSON_GetObjectItemCaseSensitive(parsed, "query_results");
+    cJSON *movie = NULL;
+    strcpy(*formatted_results, DB_MSG_COLUMNS_SHORT);
+    cJSON_ArrayForEach(movie, query_results) {
+        char *internal = NULL;
+        cJSON *id = cJSON_GetObjectItemCaseSensitive(movie, "id");
+        cJSON *title = cJSON_GetObjectItemCaseSensitive(movie, "title");
+        asprintf(&internal, "%d | %s\n\0", id->valueint, title->valuestring);
+        printf("%d %s\n",id->valueint, title->valuestring);
+        printf("%ld\n", strlen(*formatted_results));
+        strcat(*formatted_results, internal);
+        printf("After: %ld\n", strlen(*formatted_results));
+        printf("%s\n", internal);
+        free(internal);
+    }
+    cJSON_Delete(parsed);
 }
 
+void parse_query_results_full(const char * results, char ** formatted_results) {
+    cJSON *parsed = cJSON_ParseWithLength(results, strlen(results));
+    cJSON *query_results = cJSON_GetObjectItemCaseSensitive(parsed, "query_results");
+    cJSON *movie;
+    *formatted_results = malloc(sizeof results + 40);    // enough room to hold data (guaranteed) and header.
+    strcpy(*formatted_results, DB_MSG_COLUMNS_FULL);
+    cJSON_ArrayForEach(movie, query_results) {
+        char * internal;
+        cJSON *id = cJSON_GetObjectItemCaseSensitive(movie, "id");
+        cJSON *title = cJSON_GetObjectItemCaseSensitive(movie, "title");
+        cJSON *release_year = cJSON_GetObjectItemCaseSensitive(movie, "release_year");
+        cJSON *genres = cJSON_GetObjectItemCaseSensitive(movie, "genres");
+        cJSON *director = cJSON_GetObjectItemCaseSensitive(movie, "director");
+        asprintf(&internal, "%d | %s | %d | %s | %s\n", id->valueint, title->valuestring, release_year->valueint, genres->valuestring, director->valuestring);
+        strcat(*formatted_results, internal);
+        free(internal);
+    }
+    cJSON_Delete(parsed);
+}
+
+void parse_query_results_single(const char * results, char * formatted_results) {
+    cJSON *parsed = cJSON_ParseWithLength(results, strlen(results));
+    cJSON *id = cJSON_GetObjectItemCaseSensitive(parsed, "id");
+    cJSON *title = cJSON_GetObjectItemCaseSensitive(parsed, "title");
+    cJSON *release_year = cJSON_GetObjectItemCaseSensitive(parsed, "release_year");
+    cJSON *genres = cJSON_GetObjectItemCaseSensitive(parsed, "genres");
+    cJSON *director = cJSON_GetObjectItemCaseSensitive(parsed, "director");
+    asprintf(&formatted_results, "%s%d | %s | %d | %s | %s\n", DB_MSG_COLUMNS_FULL, id->valueint, title->valuestring, release_year->valueint, genres->valuestring, director->valuestring);
+    cJSON_Delete(parsed);
+}
 
 int extract_message(const char * message, char * command, char args[][1024]) {
     u_int32_t len = strlen(message);
@@ -62,138 +108,136 @@ void *serve_client(void *fd_ptr)
     char message[MAX_MESSAGE_LEN+1];
     char command[MAX_SEGMENT_LEN+1];
     char args[10][1024]; // We will not be using more than 10 args (we use much less, actually)
+    int recv_status = 0;
 
     int *fd = (int *)fd_ptr;
     int connection_fd = *fd;    //Ensures we copy the FD so we don't close another thread's connection.
-    u_int32_t bytes_received = 0;
-    u_int32_t arg_count = 0;
 
+    u_int32_t arg_count = 0;
     memset(&message, 0, sizeof message);
     memset(&command, 0, sizeof command);
     for(int i = 0; i < 10; i++) memset(&args[i], 0, sizeof args[i]);
 
-    int recv_status = recv_complete(connection_fd, message, MAX_MESSAGE_LEN, MAX_MESSAGE_LEN, 0);
-    if (recv_status == -1) {
-        pthread_exit("error");
-        return NULL;
-    } else if (recv_status == 1) {
-        pthread_exit(NULL);
-        return NULL;
-    }
+    while(recv_status == 0) {
+        arg_count = 0;
+        memset(&message, 0, sizeof message);
+        memset(&command, 0, sizeof command);
+        for(int i = 0; i < 10; i++) memset(&args[i], 0, sizeof args[i]);
+        recv_status = recv_complete(connection_fd, message, MAX_MESSAGE_LEN, MAX_MESSAGE_LEN, 0);
+        if (recv_status == -1) {
+            printf(ERROR_MSG_CONNECTION_ERROR);
+            close(connection_fd);
+            pthread_exit("error");
+            return NULL;
+        } else if (recv_status == 1) {
+            printf(CLIENT_DISCONNECTED, connection_fd);
+            close(connection_fd);
+            pthread_exit(NULL);
+            return NULL;
+        }
 
-    printf("HERE\n");
+        arg_count = extract_message(message, command, args);
 
-    arg_count = extract_message(message, command, args);
-
-    printf("command %s\n", command);
-    printf("args %s\n", args[0]);
-
-
-    if (strcmp(command, GET) == 0) {
-        char * result;
-        if (strcmp(args[0], ALL) == 0) {
-            int operation = select_all_movies(&result);
-            if (operation == 1) {
-                send_complete(connection_fd, result, strlen(result), strlen(result), 0);
-                free(result);
-            }
-            else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
-        } else if (strcmp(args[0], ALL_DETAILED) == 0) {
-            int operation = select_all_movies(&result);
-            if (operation == 1) {
-                send_complete(connection_fd, result, strlen(result), strlen(result), 0);
-                free(result);
-            }            else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
-        } else if (strcmp(args[0], ALL_GENRE) == 0) {
-            int operation = select_all_movies_by_genre(args[1], &result);
-            if (operation == 1) {
-                send_complete(connection_fd, result, strlen(result), strlen(result), 0);
-                free(result);
-            }            else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
-        } else if (strcmp(args[0], SINGLE) == 0) {
-            int id = 0;
-            int is_int = str_to_int(args[0], &id);
-            if (is_int) {
-                int operation = select_movie_by_ID(id, &result);
+        if (strcmp(command, GET) == 0) {
+            char * result = NULL;
+            if (strcmp(args[0], ALL) == 0) {
+                int operation = select_all_movies(&result);
                 if (operation == 1) {
                     send_complete(connection_fd, result, strlen(result), strlen(result), 0);
                     free(result);
                 }
-                else if (operation == 0) send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
-                else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+                else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
+            } else if (strcmp(args[0], ALL_DETAILED) == 0) {
+                int operation = select_all_movies_details(&result);
+                if (operation == 1) {
+                    send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                    free(result);
+                } else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
+            } else if (strcmp(args[0], ALL_GENRE) == 0) {
+                int operation = select_all_movies_by_genre(args[1], &result);
+                if (operation == 1) {
+                    send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                    free(result);
+                }  else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 28, 28, 0);
+            } else if (strcmp(args[0], SINGLE) == 0) {
+                int id = 0;
+                int is_int = str_to_int(args[1], &id);
+                if (is_int) {
+                    int operation = select_movie_by_ID(id, &result);
+                    if (operation == 1) {
+                        send_complete(connection_fd, result, strlen(result), strlen(result), 0);
+                        free(result);
+                    }
+                    else if (operation == 0) send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
+                    else send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+                } else {
+                    send_complete(connection_fd, ERROR_MSG_INVALID_GET, 20, 20, 0);
+                }
             } else {
                 send_complete(connection_fd, ERROR_MSG_INVALID_GET, 20, 20, 0);
             }
-        } else {
-            send_complete(connection_fd, ERROR_MSG_INVALID_GET, 20, 20, 0);
-        }
-    } else if (strcmp(command, POST) == 0) {
-        if (arg_count == 4) {
-            int release_year = 0;
-            int year_status = str_to_int(args[1], &release_year);
-            if (year_status == 0) {
-                send_complete(connection_fd, ERROR_MSG_INVALID_POST, 21, 21, 0);
-            }
-            int operation = create_movie(args[0], release_year, args[2], args[3]);
-            if (operation == 1) {
-                send_complete(connection_fd, SUCCESS_MSG_POST, 23, 23, 0);
-            } else {
-                send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
-            }
-        } else {
-            send_complete(connection_fd, ERROR_MSG_INVALID_POST, 21, 21, 0);
-        }
-    } else if (strcmp(command, PUT) == 0) {
-        if (arg_count == 2) {
-            int id = 0;
-            int is_int = str_to_int(args[0], &id);
-            if (is_int == 1) {
-                int operation = update_movie_genre(id, args[1]);
+        } else if (strcmp(command, POST) == 0) {
+            if (arg_count == 4) {
+                int release_year = 0;
+                int year_status = str_to_int(args[1], &release_year);
+                if (year_status == 0) {
+                    send_complete(connection_fd, ERROR_MSG_INVALID_POST, 21, 21, 0);
+                }
+                int operation = create_movie(args[0], release_year, args[2], args[3]);
                 if (operation == 1) {
-                    send_complete(connection_fd, SUCCESS_MSG_PUT, 23, 23, 0);
-                } else if (operation == 0) {
-                    send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
-                } else if (operation == 2) {
-                    send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 38, 38, 0);
+                    send_complete(connection_fd, SUCCESS_MSG_POST, 23, 23, 0);
                 } else {
                     send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
                 }
+            } else {
+                send_complete(connection_fd, ERROR_MSG_INVALID_POST, 21, 21, 0);
             }
-        } else {
-            send_complete(connection_fd, ERROR_MSG_INVALID_PUT, 20, 20, 0);
-        }
-    } else if (strcmp(command, DELETE) == 0) {
-        if (arg_count == 1) {
-            int id = 0;
-            int is_int = str_to_int(args[0], &id);
-            if (is_int == 1) {
-                int operation = remove_movie(id);
-                if (operation == 1) {
-                    send_complete(connection_fd, SUCCESS_MSG_DELETE, 23, 23, 0);
-                } else if (operation == 0) {
-                    send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
+        } else if (strcmp(command, PUT) == 0) {
+            if (arg_count == 2) {
+                int id = 0;
+                int is_int = str_to_int(args[0], &id);
+                if (is_int == 1) {
+                    int operation = update_movie_genre(id, args[1]);
+                    if (operation == 1) {
+                        send_complete(connection_fd, SUCCESS_MSG_PUT, 23, 23, 0);
+                    } else if (operation == 0) {
+                        send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
+                    } else if (operation == 2) {
+                        send_complete(connection_fd, ERROR_MSG_DB_INVALID_GENRE, 38, 38, 0);
+                    } else {
+                        send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+                    }
+                }
+            } else {
+                send_complete(connection_fd, ERROR_MSG_INVALID_PUT, 20, 20, 0);
+            }
+        } else if (strcmp(command, DELETE) == 0) {
+            if (arg_count == 1) {
+                int id = 0;
+                int is_int = str_to_int(args[0], &id);
+                if (is_int == 1) {
+                    int operation = remove_movie(id);
+                    if (operation == 1) {
+                        send_complete(connection_fd, SUCCESS_MSG_DELETE, 23, 23, 0);
+                    } else if (operation == 0) {
+                        send_complete(connection_fd, ERROR_MSG_DB_INVALID_ID, 41, 41, 0);
+                    } else {
+                        send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+                    }
                 } else {
-                    send_complete(connection_fd, ERROR_MSG_DB_MISC_DB, 50, 50, 0);
+                    send_complete(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 23, 0);
                 }
             } else {
                 send_complete(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 23, 0);
             }
         } else {
-            send_complete(connection_fd, ERROR_MSG_INVALID_DELETE, 23, 23, 0);
+            // Invalid command
+            send_complete(connection_fd, ERROR_MSG_INVALID_COMMAND, 24, 24, 0);
         }
-    } else {
-        // Invalid command
-        send_complete(connection_fd, ERROR_MSG_INVALID_COMMAND, 24, 24, 0);
+        //sleep(1);
     }
-
-    // if (send(connection_fd, "Hello, world!", 13, 0) == -1)
-    // {
-    //     perror("send");
-    //     close(connection_fd);
-    //     pthread_exit("error");
-    //     return NULL;
-    // }
-    close_connection(connection_fd);
+    printf(SERVER_DISCONNECTED, connection_fd);
+    close(connection_fd);
     pthread_exit(0);
     return NULL;
 }
@@ -305,9 +349,7 @@ int main(void)
         }
         pthread_t thread;
         inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), s, sizeof s);
-        printf("Server: got connection from %s\n", s);
+        printf(SERVER_CONNECTED_FD, s, new_fd);
         pthread_create(&thread, NULL, &serve_client, &new_fd);
     }
-
-
 }

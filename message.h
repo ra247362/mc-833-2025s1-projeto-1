@@ -4,34 +4,42 @@
 
 // DB CONFIG
 
-#define ERROR_INVALID_FILE_SIZE "Could not allocate buffer due to invalid file size."
-#define ERROR_BUFFER_ALLOCATION "Improper buffer allocation."
-#define ERROR_FILE_READ "Could not read file."
+#define ERROR_INVALID_FILE_SIZE "Could not allocate buffer due to invalid file size.\n"
+#define ERROR_BUFFER_ALLOCATION "Improper buffer allocation.\n"
+#define ERROR_FILE_READ "Could not read file.\n"
 #define ERROR_CJSON_BEFORE_CHARACTER "cJSON error before: %s\n"
 
 // DB
 
-#define ERROR_MSG_DB_INVALID_ID "ERROR: movie of given ID does not exist."
-#define ERROR_MSG_DB_INVALID_GENRE "ERROR: movie already has given genre."
-#define ERROR_MSG_DB_MISC_DB "ERROR: database was unable to complete operation."
+#define ERROR_MSG_DB_INVALID_ID "ERROR: movie of given ID does not exist.\n"
+#define ERROR_MSG_DB_INVALID_GENRE "ERROR: movie already has given genre.\n"
+#define ERROR_MSG_DB_MISC_DB "ERROR: database was unable to complete operation.\n"
 #define ERROR_DATABASE_OPEN "ERROR: Could not open database: %s\n"
 #define ERROR_TABLE_CREATION "ERROR: Could not create table: %s\n"
-#define ERROR_DB_SETUP "ERROR: SQLite failed: %s"
+#define ERROR_DB_SETUP "ERROR: SQLite failed: %s\n"
+
+#define DB_MSG_COLUMNS_SHORT  "ID | TITLE\n\0"
+#define DB_MSG_COLUMNS_FULL "ID | TITLE | YEAR | GENRES | DIRECTOR\n\0"
 
 // CLIENT
 
 // SERVER
-#define ERROR_MSG_INVALID_COMMAND "ERROR: Invalid command."
-#define ERROR_MSG_INVALID_GET "ERROR: Invalid GET."
-#define ERROR_MSG_INVALID_POST "ERROR: Invalid POST."
-#define ERROR_MSG_INVALID_PUT "ERROR: Invalid PUT."
-#define ERROR_MSG_INVALID_DELETE "ERROR: Invalid DELETE."
+#define ERROR_MSG_INVALID_COMMAND "ERROR: Invalid command.\n"
+#define ERROR_MSG_INVALID_GET "ERROR: Invalid GET.\n"
+#define ERROR_MSG_INVALID_POST "ERROR: Invalid POST.\n"
+#define ERROR_MSG_INVALID_PUT "ERROR: Invalid PUT.\n"
+#define ERROR_MSG_INVALID_DELETE "ERROR: Invalid DELETE.\n"
+#define ERROR_MSG_CONNECTION_ERROR "ERROR: Connection error.\n"
+
+#define CLIENT_DISCONNECTED "STOPPED: Client at FD %d disconnected.\n"
+#define SERVER_DISCONNECTED "STOPPED: Server disconnected to client at FD %d\n"
+#define SERVER_CONNECTED_FD "INIT: Server connected to client at %s on FD %d.\n"
 
 /*
     Success Messages
 */
 
-#define SUCCESS_MSG_GET "SUCCESS: Item(s) retrieved."
-#define SUCCESS_MSG_POST "SUCCESS: Item created."
-#define SUCCESS_MSG_PUT "SUCCESS: Item updated."
-#define SUCCESS_MSG_DELETE "SUCCESS: Item deleted."
+#define SUCCESS_MSG_GET "SUCCESS: Item(s) retrieved.\n"
+#define SUCCESS_MSG_POST "SUCCESS: Item created.\n"
+#define SUCCESS_MSG_PUT "SUCCESS: Item updated.\n"
+#define SUCCESS_MSG_DELETE "SUCCESS: Item deleted.\n"

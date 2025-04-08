@@ -7,13 +7,8 @@
 #include <netdb.h>
 #include <unistd.h>
 
-void close_connection(int __fd) {
-    if (send(__fd, "", 0, 0) == -1) exit(-1);
-    close(__fd);
-}
-
-int send_complete(int __fd, const char const  *__buf, int __n, int __max_message_len, int __flags) {
-    u_int32_t bytes_sent;
+int send_complete(int __fd, const char  *__buf, int __n, int __max_message_len, int __flags) {
+    u_int32_t bytes_sent = 0;
     u_int32_t err_count = 0;
     while(bytes_sent < __max_message_len) {
         u_int32_t sent = send(__fd, __buf+bytes_sent, __max_message_len, 0);
@@ -32,11 +27,10 @@ int send_complete(int __fd, const char const  *__buf, int __n, int __max_message
     return 0;
 }
 
-int recv_complete(int __fd, const char const *__buf, int __n, int __max_message_len, int __flags) {
-    u_int32_t bytes_received;
+int recv_complete(int __fd, const char *__buf, int __n, int __max_message_len, int __flags) {
+    u_int32_t bytes_received = 0;
     u_int32_t err_count = 0;
     while(bytes_received < __max_message_len) {
-        printf("%s\n", __buf);
         u_int32_t received = recv(__fd, __buf+bytes_received, __max_message_len, 0);
         if (!received) {
             close(__fd);
@@ -49,8 +43,6 @@ int recv_complete(int __fd, const char const *__buf, int __n, int __max_message_
             }
             continue;
         }
-        printf("Update: %s\n", __buf);
-
         bytes_received += received;
         if (__buf[bytes_received] == '\0') break;// Early end transmission
     }

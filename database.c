@@ -1,8 +1,8 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "database.h"
-#include "lib/sqlite3.h"
 #include "lib/cJSON.h"
 #include "message.h"
 #include <time.h>
