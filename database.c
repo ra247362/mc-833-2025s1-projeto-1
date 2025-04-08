@@ -112,7 +112,15 @@ int connect_database() {
                       "director TEXT);";
 
     char *err_msg = NULL;
-    if (sqlite3_exec(db, sql, NULL, NULL, &err_msg) != SQLITE_OK) {
+    int rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    while (rc == SQLITE_LOCKED) {
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;  // Wait between nothing 100 nsec and about 10 ms.
+        rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
+    }
+
+    if (rc != SQLITE_OK) {
         fprintf(stderr, ERROR_TABLE_CREATION, err_msg);
         sqlite3_free(err_msg);
         return 0;
@@ -229,6 +237,7 @@ int update_movie_genre(int id, const char * const genre) {
         ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;
         rc = sqlite3_step(stmt_select);
     }
+    printf("Database status: %d\n", rc);
     sqlite3_finalize(stmt_update);
     disconnect_database();
     free(new_genres);
@@ -280,6 +289,11 @@ int select_all_movies(char ** result) {
             rc = sqlite3_step(stmt);
         }
     }
+    else {
+        sqlite3_finalize(stmt);
+        disconnect_database();          
+        return -1;
+    }
     cJSON_AddItemToObject(json, "query_results", query_results);
 
     sqlite3_finalize(stmt);
@@ -317,6 +331,11 @@ int select_all_movies_details(char ** result) {
             rc = sqlite3_step(stmt);
         }
     }
+    else {
+        sqlite3_finalize(stmt);
+        disconnect_database();          
+        return -1;
+    }
     cJSON_AddItemToObject(json, "query_results", query_results);
 
 
@@ -353,6 +372,11 @@ int select_movie_by_ID(int id, char ** result) {
             rc = sqlite3_step(stmt);
         }
     }
+    else {
+        sqlite3_finalize(stmt);
+        disconnect_database();          
+        return -1;
+    }
 
     sqlite3_finalize(stmt);
     disconnect_database();
@@ -388,6 +412,11 @@ int select_all_movies_by_genre(const char * const genre, char ** result) {
             cJSON_AddItemToArray(query_results, movie);
             rc = sqlite3_step(stmt);
         }
+    }
+    else {
+        sqlite3_finalize(stmt);
+        disconnect_database();          
+        return -1;
     }
     cJSON_AddItemToObject(json, "query_results", query_results);
 
