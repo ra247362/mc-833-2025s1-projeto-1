@@ -26,6 +26,45 @@
 int sockfd;
 int status = 1;
 
+void parse_query_results_short(const char * results) {
+    cJSON *parsed = cJSON_Parse(results);
+    cJSON *query_results = cJSON_GetObjectItemCaseSensitive(parsed, "query_results");
+    cJSON *movie = NULL;
+    printf(DB_MSG_COLUMNS_SHORT);
+    cJSON_ArrayForEach(movie, query_results) {
+        cJSON *id = cJSON_GetObjectItemCaseSensitive(movie, "id");
+        cJSON *title = cJSON_GetObjectItemCaseSensitive(movie, "title");
+        printf("%d | %s\n", id->valueint, title->valuestring);
+    }
+    cJSON_Delete(parsed);
+}
+
+void parse_query_results_full(const char * results) {
+    cJSON *parsed = cJSON_ParseWithLength(results, strlen(results));
+    cJSON *query_results = cJSON_GetObjectItemCaseSensitive(parsed, "query_results");
+    cJSON *movie;
+    printf(DB_MSG_COLUMNS_FULL);
+    cJSON_ArrayForEach(movie, query_results) {
+        cJSON *id = cJSON_GetObjectItemCaseSensitive(movie, "id");
+        cJSON *title = cJSON_GetObjectItemCaseSensitive(movie, "title");
+        cJSON *release_year = cJSON_GetObjectItemCaseSensitive(movie, "release_year");
+        cJSON *genres = cJSON_GetObjectItemCaseSensitive(movie, "genres");
+        cJSON *director = cJSON_GetObjectItemCaseSensitive(movie, "director");
+        printf("%d | %s | %d | %s | %s\n", id->valueint, title->valuestring, release_year->valueint, genres->valuestring, director->valuestring);
+    }
+    cJSON_Delete(parsed);
+}
+
+void parse_query_results_single(const char * results) {
+    cJSON *parsed = cJSON_ParseWithLength(results, strlen(results));
+    cJSON *id = cJSON_GetObjectItemCaseSensitive(parsed, "id");
+    cJSON *title = cJSON_GetObjectItemCaseSensitive(parsed, "title");
+    cJSON *release_year = cJSON_GetObjectItemCaseSensitive(parsed, "release_year");
+    cJSON *genres = cJSON_GetObjectItemCaseSensitive(parsed, "genres");
+    cJSON *director = cJSON_GetObjectItemCaseSensitive(parsed, "director");
+    printf("%s%d | %s | %d | %s | %s\n", DB_MSG_COLUMNS_FULL, id->valueint, title->valuestring, release_year->valueint, genres->valuestring, director->valuestring);
+    cJSON_Delete(parsed);
+}
 
 void clear_input() {
     int c;
@@ -65,7 +104,8 @@ void add_movie() {
         temp[strcspn(temp, "\n")] = 0;
         genres[i] = strdup(temp);
     }
-    genres[num_genres] = NULL;
+    if (num_genres <= MAX_GENRES) genres[num_genres] = NULL;
+    else genres[MAX_GENRES] = NULL;
 
     char genre_str[512] = "";
     for (int i = 0; genres[i] != NULL; i++) {
@@ -158,10 +198,11 @@ void list_movies() {
         close(sockfd);
     }
 
-    if (response) {
-        printf("Filmes:\n%s\n", response);
+    if (strcmp(response, "{\"query_results\":[]}") != 0) {
+        parse_query_results_short(response);
+        //printf("Filmes:\n%s\n", response);
     } else {
-        printf("Nenhum filme encontrado.\n");
+        printf(CLIENT_NO_MOVIES_FOUND);
     }
 }
 
@@ -185,10 +226,11 @@ void list_movies_with_details() {
         close(sockfd);
     }
 
-    if (response) {
-        printf("Filmes (detalhado):\n%s\n", response);
+    if (strcmp(response, "{\"query_results\":[]}") != 0) {
+        parse_query_results_full(response);
+        //printf("Filmes:\n%s\n", response);
     } else {
-        printf("Nenhum filme encontrado.\n");
+        printf(CLIENT_NO_MOVIES_FOUND);
     }
 }
 
@@ -218,10 +260,11 @@ void list_movies_by_genre() {
         printf("Closed");
         close(sockfd);
     }
-    if (response) {
-        printf("Filmes com gênero '%s':\n%s\n", genre, response);
+    if (strcmp(response, "{\"query_results\":[]}") != 0) {
+        parse_query_results_short(response);
+        //printf("Filmes:\n%s\n", response);
     } else {
-        printf("Nenhum filme encontrado com esse gênero.\n");
+        printf(CLIENT_NO_MOVIES_FOUND);
     }
 }
 
@@ -250,10 +293,11 @@ void list_movie_details_by_id() {
         printf("Closed");
         close(sockfd);
     }
-    if (response) {
-        printf("Detalhes do filme:\n%s\n", response);
+    if (strcmp(response, "{}") != 0) {
+        parse_query_results_single(response);
+        //printf("Filmes:\n%s\n", response);
     } else {
-        printf("Filme não encontrado.\n");
+        printf(CLIENT_NO_MOVIES_FOUND);
     }
 }
 
