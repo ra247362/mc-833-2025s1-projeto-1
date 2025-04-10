@@ -113,7 +113,7 @@ int connect_database() {
 
     char *err_msg = NULL;
     int rc = sqlite3_exec(db, sql, NULL, NULL, &err_msg);
-    while (rc == SQLITE_LOCKED) {
+    while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
         struct timespec ts;
         ts.tv_sec = 0;
         ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;  // Wait between nothing 100 nsec and about 10 ms.
@@ -150,7 +150,7 @@ int create_movie(const char * title, int release_year, const char * genres, cons
     sqlite3_bind_text(stmt, 4, diretor, -1, SQLITE_STATIC);
 
     int rc = sqlite3_step(stmt);
-    while (rc == SQLITE_LOCKED) {
+    while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
         struct timespec ts;
         ts.tv_sec = 0;
         ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;  // Wait between nothing 100 nsec and about 10 ms.
@@ -178,7 +178,7 @@ int update_movie_genre(int id, const char * const genre) {
 
     char *current_genres = NULL;
     int rc = sqlite3_step(stmt_select);
-    while (rc == SQLITE_LOCKED) {
+    while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
         struct timespec ts;
         ts.tv_sec = 0;
         ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;
@@ -231,7 +231,7 @@ int update_movie_genre(int id, const char * const genre) {
     sqlite3_bind_int(stmt_update, 2, id);
 
     rc = sqlite3_step(stmt_update);
-    while (rc == SQLITE_LOCKED) {
+    while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
         struct timespec ts;
         ts.tv_sec = 0;
         ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;
@@ -255,7 +255,7 @@ int remove_movie(int id) {
     sqlite3_bind_int(stmt, 1, id);
 
     int rc = sqlite3_step(stmt);
-    while (rc == SQLITE_LOCKED) {
+    while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
         struct timespec ts;
         ts.tv_sec = 0;
         ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;
@@ -275,7 +275,7 @@ int select_all_movies(char ** result) {
     cJSON *query_results = cJSON_CreateArray();
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
         int rc = sqlite3_step(stmt);
-        while (rc == SQLITE_LOCKED) {
+        while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
             struct timespec ts;
             ts.tv_sec = 0;
             ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;
@@ -314,7 +314,7 @@ int select_all_movies_details(char ** result) {
     cJSON *query_results = cJSON_CreateArray();
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
         int rc = sqlite3_step(stmt);
-        while (rc == SQLITE_LOCKED) {
+        while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
             struct timespec ts;
             ts.tv_sec = 0;
             ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;
@@ -357,7 +357,7 @@ int select_movie_by_ID(int id, char ** result) {
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, id);
         int rc = sqlite3_step(stmt);
-        while (rc == SQLITE_LOCKED) {
+        while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
             struct timespec ts;
             ts.tv_sec = 0;
             ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;
@@ -399,7 +399,7 @@ int select_all_movies_by_genre(const char * const genre, char ** result) {
         snprintf(like_param, sizeof(like_param), "%%%s%%", genre);
         sqlite3_bind_text(stmt, 1, like_param, -1, SQLITE_STATIC);
         int rc = sqlite3_step(stmt);
-        while (rc == SQLITE_LOCKED) {
+        while (rc == SQLITE_LOCKED || rc == SQLITE_BUSY) {
             struct timespec ts;
             ts.tv_sec = 0;
             ts.tv_nsec = (rand() % 1000l) * 100000l + 100l;

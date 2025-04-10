@@ -215,12 +215,6 @@ void *serve_client(void *fd_ptr)
     return NULL;
 }
 
-/*
-    Parameters might be args if necessary.
-    Possible refactors:
-    - Move main loop to another function
-    - Implement error handling
-*/
 int main(void)
 {
     int addr_status; // Address status;

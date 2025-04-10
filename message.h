@@ -25,7 +25,38 @@
 #define DB_MSG_COLUMNS_FULL "ID | TITLE | YEAR | GENRES | DIRECTOR\n"
 
 // CLIENT
-#define CLIENT_NO_MOVIES_FOUND "No movies matched the given query."
+#define CLIENT_MENU "\n====== PIPOCA Client v%d.0 ======\n"
+#define CLIENT_ADD_MOVIE "1. Add movie\n"
+#define CLIENT_ADD_GENRE "2. Add genre to movie\n"
+#define CLIENT_LIST_MOVIES "3.List all movies\n"
+#define CLIENT_LIST_DETAILS "4.List all movies (detailed)\n"
+#define CLIENT_LIST_GENRE "5. List movies by genre\n"
+#define CLIENT_LIST_ID "6.List movie details by ID\n"
+#define CLIENT_REMOVE "7. Remove movie by ID\n"
+#define CLIENT_LEAVE "0. Leave\n"
+#define CLIENT_SELECT_OPTION "Choose a operation by inserting its number: "
+#define CLIENT_QUIT "Quitting...\n"
+#define CLIENT_INVALID_OPTION "Invalid option!\n"
+
+#define CLIENT_CONNECTING_TO_SERVER "CLIENT: Connected to server.\n"
+
+#define CLIENT_NO_MOVIES_FOUND "No movies matched the given query.\n"
+
+#define CLIENT_QUERY_BUILDER_TITLE "Please insert the movie's title: "
+#define CLIENT_QUERY_BUILDER_YEAR "Please insert the movie's release year: "
+#define CLIENT_QUERY_BUILDER_DIRECTOR "Please insert the movie's main director: "
+#define CLIENT_QUERY_BUILDER_GENRE_NUMBER "Please insert the number of genres the movie has (max. %d): "
+#define CLIENT_QUERY_BUILDER_GENRE "Please provide a genre number %d: "
+
+#define CLIENT_QUERY_BUILDER_ID "Please provide the ID of the movie: "
+#define CLIENT_QUERY_BUILDER_SINGLE_GENRE "Please provide the genre you would like to add to the movie: "
+#define CLIENT_QUERY_BUILDER_SEARCH_GENRE "Please provide the provide to filter movies by: "
+
+#define SERVER_CLOSED "STOPPED: Server closed connection.\n"
+
+#define ERROR_CLIENT_SOCKET "CLIENT: Socket"
+#define ERROR_CLIENT_CONNECT "CLIENT: Connect"
+#define ERROR_CLIENT_CONNECTION "CLIENT: Failed to connect.\n"
 
 // SERVER
 #define ERROR_MSG_INVALID_COMMAND "ERROR: Invalid command.\n"

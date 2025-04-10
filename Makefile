@@ -1,25 +1,9 @@
-all: main.c
+all: client.c server.c utils.c network.c database.c
 	gcc -c utils.c -Llib -lsqlite3 -lcjson
 	gcc -c network.c -Llib -lsqlite3 -lcjson
 	gcc -c database.c -Llib -lsqlite3 -lcjson
-	gcc main.c database.o network.o -std=gnu99 -Llib -lsqlite3 -lcjson -pthread -ldl -o main.exe
+	gcc client.c database.o network.o -std=gnu99 -Llib -lsqlite3 -lcjson -pthread -ldl -o client.exe
 	gcc server.c network.o database.o utils.o -Llib -lsqlite3 -lcjson -pthread -ldl -o server.exe
-#	gcc client.c network.o -Llib -lsqlite3 -lcjson -o client.exe
-
 
 clean:
-	rm main.exe server.exe
-
-#all: main.exe server.exe client.exe
-#
-#main.exe: main.c database.c db_setup.c
-#	gcc main.c database.c db_setup.c -Llib -lsqlite3 -lcjson -o main.exe
-#
-#server.exe: server.c database.c db_setup.c
-#	gcc server.c database.c db_setup.c -Llib -lsqlite3 -lcjson -pthread -o server.exe
-#
-#client.exe: client.c
-#	gcc client.c -Llib -lsqlite3 -lcjson -o client.exe
-#
-#clean:
-#	rm -f main.exe server.exe client.exe
+	rm main.exe server.exe network.o database.o utils.o
