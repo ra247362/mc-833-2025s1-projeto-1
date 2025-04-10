@@ -100,7 +100,7 @@ void add_movie() {
 
     for (int i = 0; i < num_genres && i < MAX_GENRES; i++) {
         char temp[MAX_LENGTH];
-        printf(CLIENT_QUERY_BUILDER_GENRE_NUMBER, i + 1);
+        printf(CLIENT_QUERY_BUILDER_GENRE, i + 1);
         fgets(temp, sizeof(temp), stdin);
         temp[strcspn(temp, "\n")] = 0;
         genres[i] = strdup(temp);
